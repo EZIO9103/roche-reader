@@ -1,10 +1,10 @@
 {
   "id": "roche-xhs-forwarder",
   "name": "小红书转发",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "在 Roche 输入框粘贴小红书分享链接，读取笔记正文与配图文字，并以转发卡片发送给 AI。",
   "author": "Ranni",
-  "entry": "https://cdn.jsdelivr.net/gh/EZIO9103/roche-reader@c5aace79af1e984ae5395608eca8f984cf312b88/plugin.js",
+  "entry": "https://cdn.jsdelivr.net/gh/EZIO9103/roche-reader@fba01adfe728e8c5b59bb40b8c9a85922fa60a5d/plugin.js",
   "hash": "",
   "permissions": [
     "storage",
