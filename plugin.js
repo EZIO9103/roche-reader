@@ -2,7 +2,7 @@
   "use strict";
 
   var PLUGIN_ID = "roche-xhs-forwarder";
-  var VERSION = "0.3.2";
+  var VERSION = "0.3.3";
   var CONFIG_KEY = "rxf_xhs_config_v1";
   var MARKER_START = "[XHS_CARD_V1]";
   var MARKER_END = "[/XHS_CARD_V1]";
@@ -366,25 +366,19 @@
       ".rxf-xhs-btn:disabled{opacity:.55;}",
       ".rxf-xhs-spinner{width:15px;height:15px;border:2px solid rgba(255,36,66,.25);border-top-color:#ff2442;border-radius:50%;animation:rxfspin .8s linear infinite;}",
       "@keyframes rxfspin{to{transform:rotate(360deg)}}",
-      ".rxf-rendered-card{width:min(330px,74vw);min-width:238px;border-radius:16px;overflow:hidden;background:#fff;color:#202124;border:1px solid rgba(0,0,0,.08);box-shadow:0 4px 15px rgba(24,24,28,.10);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;text-align:left;}",
+      ".rxf-rendered-card{width:min(340px,80vw);min-width:250px;border-radius:14px;overflow:hidden;background:#fff;color:#202124;border:1px solid rgba(0,0,0,.08);box-shadow:0 3px 12px rgba(24,24,28,.09);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;text-align:left;cursor:pointer;}",
       ".rxf-card-note{padding:10px 12px;border-bottom:1px solid #eee;font-size:14px;line-height:1.45;white-space:pre-wrap;}",
-      ".rxf-card-top{display:flex;align-items:center;gap:7px;padding:9px 11px;background:rgba(255,255,255,.96);cursor:pointer;}",
-      ".rxf-card-logo{display:grid;place-items:center;width:24px;height:24px;border-radius:8px;background:linear-gradient(135deg,#ff2442,#ff637c);color:#fff;font-size:11px;font-weight:850;letter-spacing:-.5px;box-shadow:0 3px 8px rgba(255,36,66,.22);}",
-      ".rxf-card-source{flex:1;font-size:12px;color:#ff2442;font-weight:800;}",
-      ".rxf-card-kind{font-size:11px;color:#9a9da3;}",
-      ".rxf-card-media{position:relative;background:linear-gradient(145deg,#f3f0f6,#eee9f3);overflow:hidden;}",
-      ".rxf-card-hero{display:flex;align-items:center;justify-content:center;width:100%;height:min(238px,54vw);min-height:190px;background:rgba(255,255,255,.28);overflow:hidden;}",
-      ".rxf-card-hero img{display:block;width:100%;height:100%;object-fit:cover;object-position:top center;background:#f4f1f6;}",
-      ".rxf-card-count{position:absolute;right:10px;bottom:10px;padding:4px 8px;border-radius:999px;background:rgba(20,20,24,.68);color:#fff;font-size:10px;font-weight:700;line-height:1;backdrop-filter:blur(8px);pointer-events:none;}",
-      ".rxf-card-empty{display:grid;place-items:center;min-height:220px;background:linear-gradient(145deg,#ff2442,#ff91a2);color:#fff;font-size:26px;font-weight:850;letter-spacing:2px;}",
-      ".rxf-card-info{padding:10px 12px 11px;cursor:pointer;}",
-      ".rxf-card-title{font-size:15px;line-height:1.4;font-weight:760;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}",
-      ".rxf-card-desc{font-size:12px;line-height:1.5;color:#777;margin-top:6px;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}",
-      ".rxf-card-author{display:flex;align-items:center;gap:6px;margin-top:9px;color:#9a9da3;font-size:11px;}",
-      ".rxf-card-author-dot{width:5px;height:5px;border-radius:50%;background:#ff2442;}",
-      ".rxf-card-foot{display:flex;align-items:center;gap:6px;padding:9px 12px;background:#f7f7f8;color:#767a80;font-size:11px;border-top:1px solid rgba(0,0,0,.035);cursor:pointer;}",
-      ".rxf-card-foot span:first-child{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
-      "@media(prefers-color-scheme:dark){.rxf-xhs-preview,.rxf-rendered-card{background:rgba(31,32,35,.98);color:#f4f4f5;border-color:rgba(255,255,255,.1)}.rxf-xhs-preview-head,.rxf-card-note{border-color:rgba(255,255,255,.09)}.rxf-card-top{background:#202125}.rxf-card-media,.rxf-card-hero,.rxf-card-hero img{background:#292a2f}.rxf-xhs-meta,.rxf-card-desc,.rxf-card-author,.rxf-card-foot{color:#a8abb2}.rxf-xhs-btn{background:#3b3d42;color:#f4f4f5}.rxf-card-foot{background:#292a2e;border-color:rgba(255,255,255,.05)}}"
+      ".rxf-card-body{display:flex;align-items:stretch;gap:11px;padding:13px 13px 12px;min-height:116px;}",
+      ".rxf-card-copy{flex:1;min-width:0;display:flex;flex-direction:column;}",
+      ".rxf-card-title{font-size:16px;line-height:1.35;font-weight:760;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}",
+      ".rxf-card-desc{font-size:13px;line-height:1.45;color:#777;margin-top:6px;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}",
+      ".rxf-card-thumb{display:flex;align-items:center;justify-content:center;width:96px;height:96px;flex:0 0 96px;border-radius:7px;overflow:hidden;background:linear-gradient(145deg,#f3f0f6,#eee9f3);color:#fff;font-size:12px;font-weight:800;}",
+      ".rxf-card-thumb img{display:block;width:100%;height:100%;object-fit:cover;object-position:top center;}",
+      ".rxf-card-foot{display:flex;align-items:center;gap:7px;padding:8px 12px;border-top:1px solid rgba(0,0,0,.055);color:#8b8e94;font-size:12px;}",
+      ".rxf-card-logo{display:grid;place-items:center;width:20px;height:20px;border-radius:6px;background:#ff2442;color:#fff;font-size:8px;font-weight:850;letter-spacing:-.4px;}",
+      ".rxf-card-source{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
+      ".rxf-card-kind{font-size:11px;color:#a1a4aa;white-space:nowrap;}",
+      "@media(prefers-color-scheme:dark){.rxf-xhs-preview,.rxf-rendered-card{background:rgba(31,32,35,.98);color:#f4f4f5;border-color:rgba(255,255,255,.1)}.rxf-xhs-preview-head,.rxf-card-note,.rxf-card-foot{border-color:rgba(255,255,255,.09)}.rxf-card-thumb,.rxf-card-thumb img{background:#292a2f}.rxf-xhs-meta,.rxf-card-desc,.rxf-card-foot{color:#a8abb2}.rxf-xhs-btn{background:#3b3d42;color:#f4f4f5}}"
     ].join("");
     document.head.appendChild(style);
     state.style = style;
@@ -733,61 +727,43 @@
     var imageCount = Number(payload.imageCount) || images.length;
     var cover = images[0] || payload.cover || "";
 
-    var top = element("div", "rxf-card-top");
-    top.appendChild(element("div", "rxf-card-logo", "RED"));
-    top.appendChild(element("div", "rxf-card-source", "小红书 · 转发"));
-    top.appendChild(element("div", "rxf-card-kind", imageCount ? "图文 · " + imageCount + " 张" : "图文笔记"));
-    card.appendChild(top);
+    var body = element("div", "rxf-card-body");
+    var copy = element("div", "rxf-card-copy");
+    copy.appendChild(element("div", "rxf-card-title", payload.title || "小红书笔记"));
+    if (payload.content) copy.appendChild(element("div", "rxf-card-desc", payload.content));
+    body.appendChild(copy);
 
-    var media = element("div", "rxf-card-media");
+    var thumb = element("div", "rxf-card-thumb");
     if (cover) {
-      var hero = element("div", "rxf-card-hero");
       var image = element("img", "");
       image.src = cover;
       image.alt = "小红书首图";
       image.loading = "lazy";
       image.referrerPolicy = "no-referrer";
       image.onerror = function () {
-        hero.replaceChildren(element("div", "rxf-card-desc", "首图暂时无法显示"));
+        thumb.textContent = "小红书";
       };
-      hero.appendChild(image);
-      media.appendChild(hero);
-      media.appendChild(element("div", "rxf-card-count", imageCount > 1 ? "首图 · 共 " + imageCount + " 张" : "1 张"));
+      thumb.appendChild(image);
     } else {
-      media.appendChild(element("div", "rxf-card-empty", "小红书"));
+      thumb.textContent = "小红书";
     }
-    card.appendChild(media);
-
-    var info = element("div", "rxf-card-info");
-    info.appendChild(element("div", "rxf-card-title", payload.title || "小红书笔记"));
-    if (payload.content) info.appendChild(element("div", "rxf-card-desc", payload.content));
-    if (payload.author) {
-      var author = element("div", "rxf-card-author");
-      author.appendChild(element("span", "rxf-card-author-dot"));
-      author.appendChild(element("span", "", payload.author));
-      info.appendChild(author);
-    }
-    card.appendChild(info);
+    body.appendChild(thumb);
+    card.appendChild(body);
 
     var foot = element("div", "rxf-card-foot");
-    var label = payload.imageCount
-      ? "正文 · " + payload.imageCount + " 张原图"
-      : "已读取笔记正文";
-    if (payload.ocrCount) label += " · 识别 " + payload.ocrCount + " 张图中文字";
-    foot.appendChild(element("span", "", label));
-    foot.appendChild(element("span", "", "打开原文 ›"));
+    foot.appendChild(element("span", "rxf-card-logo", "RED"));
+    foot.appendChild(element("span", "rxf-card-source", payload.author ? "小红书 · " + payload.author : "小红书"));
+    foot.appendChild(element("span", "rxf-card-kind", imageCount ? "图文 · " + imageCount + " 张" : "图文笔记"));
     card.appendChild(foot);
 
     function open() {
       if (payload.url) window.open(payload.url, "_blank", "noopener,noreferrer");
     }
-    [top, info, foot].forEach(function (node) {
-      node.setAttribute("role", "link");
-      node.tabIndex = 0;
-      node.addEventListener("click", open);
-      node.addEventListener("keydown", function (event) {
+    card.setAttribute("role", "link");
+    card.tabIndex = 0;
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", function (event) {
       if (event.key === "Enter" || event.key === " ") open();
-      });
     });
     return card;
   }
