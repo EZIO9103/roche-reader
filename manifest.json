@@ -4,7 +4,7 @@
   "version": "0.3.0",
   "description": "在 Roche 输入框粘贴小红书分享链接，读取笔记正文与配图文字，并以转发卡片发送给 AI。",
   "author": "Ranni",
-  "entry": "https://raw.githack.com/EZIO9103/roche-reader/main/plugin.js?v=0.3.0",
+  "entry": "https://cdn.jsdelivr.net/gh/EZIO9103/roche-reader@fe4ad9828103541e665023080be47a9388fa53af/plugin.js",
   "hash": "",
   "permissions": [
     "storage",
