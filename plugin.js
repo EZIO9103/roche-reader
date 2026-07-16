@@ -2,7 +2,7 @@
   "use strict";
 
   var PLUGIN_ID = "roche-xhs-forwarder";
-  var VERSION = "0.3.1";
+  var VERSION = "0.3.2";
   var CONFIG_KEY = "rxf_xhs_config_v1";
   var MARKER_START = "[XHS_CARD_V1]";
   var MARKER_END = "[/XHS_CARD_V1]";
@@ -274,7 +274,7 @@
       url: data.canonicalUrl || data.originalUrl || "",
       title: cleanText(data.title, 180) || "小红书笔记",
       author: cleanText(data.author, 80),
-      content: cleanText(data.content, 500),
+      content: cleanText(data.content, 96),
       cover: data.cover || "",
       images: images,
       imageCount: images.length,
@@ -366,23 +366,23 @@
       ".rxf-xhs-btn:disabled{opacity:.55;}",
       ".rxf-xhs-spinner{width:15px;height:15px;border:2px solid rgba(255,36,66,.25);border-top-color:#ff2442;border-radius:50%;animation:rxfspin .8s linear infinite;}",
       "@keyframes rxfspin{to{transform:rotate(360deg)}}",
-      ".rxf-rendered-card{width:min(410px,calc(100vw - 94px));min-width:250px;border-radius:18px;overflow:hidden;background:#fff;color:#202124;border:1px solid rgba(0,0,0,.08);box-shadow:0 5px 18px rgba(24,24,28,.10);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;text-align:left;}",
+      ".rxf-rendered-card{width:min(330px,74vw);min-width:238px;border-radius:16px;overflow:hidden;background:#fff;color:#202124;border:1px solid rgba(0,0,0,.08);box-shadow:0 4px 15px rgba(24,24,28,.10);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;text-align:left;}",
       ".rxf-card-note{padding:10px 12px;border-bottom:1px solid #eee;font-size:14px;line-height:1.45;white-space:pre-wrap;}",
-      ".rxf-card-top{display:flex;align-items:center;gap:8px;padding:10px 13px;background:rgba(255,255,255,.96);cursor:pointer;}",
-      ".rxf-card-logo{display:grid;place-items:center;width:26px;height:26px;border-radius:9px;background:linear-gradient(135deg,#ff2442,#ff637c);color:#fff;font-size:12px;font-weight:850;letter-spacing:-.5px;box-shadow:0 3px 8px rgba(255,36,66,.22);}",
+      ".rxf-card-top{display:flex;align-items:center;gap:7px;padding:9px 11px;background:rgba(255,255,255,.96);cursor:pointer;}",
+      ".rxf-card-logo{display:grid;place-items:center;width:24px;height:24px;border-radius:8px;background:linear-gradient(135deg,#ff2442,#ff637c);color:#fff;font-size:11px;font-weight:850;letter-spacing:-.5px;box-shadow:0 3px 8px rgba(255,36,66,.22);}",
       ".rxf-card-source{flex:1;font-size:12px;color:#ff2442;font-weight:800;}",
       ".rxf-card-kind{font-size:11px;color:#9a9da3;}",
       ".rxf-card-media{position:relative;background:linear-gradient(145deg,#f3f0f6,#eee9f3);overflow:hidden;}",
-      ".rxf-card-hero{display:flex;align-items:center;justify-content:center;width:100%;min-height:260px;background:rgba(255,255,255,.28);}",
-      ".rxf-card-hero img{display:block;width:100%;height:auto;max-height:520px;aspect-ratio:3/4;object-fit:contain;background:#f4f1f6;}",
+      ".rxf-card-hero{display:flex;align-items:center;justify-content:center;width:100%;height:min(238px,54vw);min-height:190px;background:rgba(255,255,255,.28);overflow:hidden;}",
+      ".rxf-card-hero img{display:block;width:100%;height:100%;object-fit:cover;object-position:top center;background:#f4f1f6;}",
       ".rxf-card-count{position:absolute;right:10px;bottom:10px;padding:4px 8px;border-radius:999px;background:rgba(20,20,24,.68);color:#fff;font-size:10px;font-weight:700;line-height:1;backdrop-filter:blur(8px);pointer-events:none;}",
       ".rxf-card-empty{display:grid;place-items:center;min-height:220px;background:linear-gradient(145deg,#ff2442,#ff91a2);color:#fff;font-size:26px;font-weight:850;letter-spacing:2px;}",
-      ".rxf-card-info{padding:12px 14px 13px;cursor:pointer;}",
-      ".rxf-card-title{font-size:16px;line-height:1.4;font-weight:760;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}",
-      ".rxf-card-desc{font-size:12px;line-height:1.5;color:#777;margin-top:6px;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;}",
+      ".rxf-card-info{padding:10px 12px 11px;cursor:pointer;}",
+      ".rxf-card-title{font-size:15px;line-height:1.4;font-weight:760;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}",
+      ".rxf-card-desc{font-size:12px;line-height:1.5;color:#777;margin-top:6px;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}",
       ".rxf-card-author{display:flex;align-items:center;gap:6px;margin-top:9px;color:#9a9da3;font-size:11px;}",
       ".rxf-card-author-dot{width:5px;height:5px;border-radius:50%;background:#ff2442;}",
-      ".rxf-card-foot{display:flex;align-items:center;gap:6px;padding:10px 14px;background:#f7f7f8;color:#767a80;font-size:11px;border-top:1px solid rgba(0,0,0,.035);cursor:pointer;}",
+      ".rxf-card-foot{display:flex;align-items:center;gap:6px;padding:9px 12px;background:#f7f7f8;color:#767a80;font-size:11px;border-top:1px solid rgba(0,0,0,.035);cursor:pointer;}",
       ".rxf-card-foot span:first-child{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
       "@media(prefers-color-scheme:dark){.rxf-xhs-preview,.rxf-rendered-card{background:rgba(31,32,35,.98);color:#f4f4f5;border-color:rgba(255,255,255,.1)}.rxf-xhs-preview-head,.rxf-card-note{border-color:rgba(255,255,255,.09)}.rxf-card-top{background:#202125}.rxf-card-media,.rxf-card-hero,.rxf-card-hero img{background:#292a2f}.rxf-xhs-meta,.rxf-card-desc,.rxf-card-author,.rxf-card-foot{color:#a8abb2}.rxf-xhs-btn{background:#3b3d42;color:#f4f4f5}.rxf-card-foot{background:#292a2e;border-color:rgba(255,255,255,.05)}}"
     ].join("");
