@@ -2,7 +2,7 @@
   "use strict";
 
   var PLUGIN_ID = "roche-xhs-forwarder";
-  var VERSION = "0.2.0";
+  var VERSION = "0.2.2";
   var CONFIG_KEY = "rxf_xhs_config_v1";
   var MARKER_START = "[XHS_CARD_V1]";
   var MARKER_END = "[/XHS_CARD_V1]";
@@ -37,6 +37,9 @@
     listenersInstalled: false,
     bypassSend: false,
     lastInput: null,
+    inputSnapshots: new WeakMap(),
+    inputFallbackTimer: null,
+    ignoreInputDetection: false,
     destroyed: false
   };
 
@@ -133,8 +136,71 @@
     var next = existing;
     if (next && !/\s$/.test(next)) next += " ";
     next += text;
-    setEditableValue(input, next);
+    state.ignoreInputDetection = true;
+    try {
+      setEditableValue(input, next);
+      state.inputSnapshots.set(input, next);
+    } finally {
+      state.ignoreInputDetection = false;
+    }
     input.focus();
+  }
+
+  function insertedText(before, after) {
+    var left = 0;
+    var maxLeft = Math.min(before.length, after.length);
+    while (left < maxLeft && before.charAt(left) === after.charAt(left)) left += 1;
+    var right = 0;
+    var beforeRemain = before.length - left;
+    var afterRemain = after.length - left;
+    while (
+      right < beforeRemain &&
+      right < afterRemain &&
+      before.charAt(before.length - 1 - right) === after.charAt(after.length - 1 - right)
+    ) {
+      right += 1;
+    }
+    return after.slice(left, after.length - right);
+  }
+
+  function stripXhsUrls(text) {
+    var original = String(text || "");
+    var cleaned = original.replace(/https?:\/\/[^\s<>"']+/gi, function (match) {
+      return normalizeCandidateUrl(match) ? "" : match;
+    });
+    if (/(复制.{0,20}(打开|浏览).{0,12}(小红书|RedNote)|打开.{0,12}(小红书|RedNote).{0,20}(查看|浏览))/i.test(original)) {
+      return "";
+    }
+    return cleaned.replace(/[ \t]{2,}/g, " ").replace(/^\s+|\s+$/g, "");
+  }
+
+  function setInputWithoutDetection(input, value) {
+    state.ignoreInputDetection = true;
+    try {
+      setEditableValue(input, value);
+      state.inputSnapshots.set(input, value);
+    } finally {
+      state.ignoreInputDetection = false;
+    }
+  }
+
+  function beginReadFromInput(input, sourceText, preservedText) {
+    if (!input || state.pending) return false;
+    var current = getEditableValue(input);
+    var source = String(sourceText || current);
+    var url = extractXhsUrl(source) || extractXhsUrl(current);
+    if (!url) return false;
+    if (!state.config.baseUrl) {
+      toast("检测到小红书链接，请先打开“小红书转发”设置读取服务");
+      return false;
+    }
+    if (state.inputFallbackTimer) clearTimeout(state.inputFallbackTimer);
+    state.inputFallbackTimer = null;
+    var remaining = preservedText === undefined ? stripXhsUrls(current) : String(preservedText || "");
+    setInputWithoutDetection(input, remaining);
+    state.lastInput = input;
+    startRead(source, url, input);
+    return true;
   }
 
   function normalizeCandidateUrl(raw) {
@@ -434,6 +500,8 @@
 
   function onPaste(event) {
     if (state.destroyed || !isEditable(event.target)) return;
+    state.lastInput = event.target;
+    state.inputSnapshots.set(event.target, getEditableValue(event.target));
     var text = "";
     try {
       text = event.clipboardData.getData("text/plain");
@@ -447,6 +515,48 @@
     event.preventDefault();
     event.stopPropagation();
     startRead(text, url, event.target);
+  }
+
+  function onBeforeInput(event) {
+    if (state.destroyed || state.bypassSend || state.ignoreInputDetection || state.pending) return;
+    if (!isEditable(event.target)) return;
+    var input = event.target;
+    state.lastInput = input;
+    var before = getEditableValue(input);
+    state.inputSnapshots.set(input, before);
+    var text = String(event.data || "");
+    if (!extractXhsUrl(text) || !state.config.baseUrl) return;
+    event.preventDefault();
+    event.stopPropagation();
+    beginReadFromInput(input, text, before);
+  }
+
+  function onFocusIn(event) {
+    if (!isEditable(event.target)) return;
+    state.lastInput = event.target;
+    state.inputSnapshots.set(event.target, getEditableValue(event.target));
+  }
+
+  function onInput(event) {
+    if (!isEditable(event.target)) return;
+    var input = event.target;
+    var after = getEditableValue(input);
+    var before = state.inputSnapshots.has(input) ? state.inputSnapshots.get(input) : "";
+    state.inputSnapshots.set(input, after);
+    state.lastInput = input;
+    if (state.destroyed || state.bypassSend || state.ignoreInputDetection || state.pending) return;
+    var inserted = insertedText(String(before || ""), after);
+    var source = extractXhsUrl(inserted) ? inserted : after;
+    if (!extractXhsUrl(source)) return;
+    if (state.inputFallbackTimer) clearTimeout(state.inputFallbackTimer);
+    state.inputFallbackTimer = setTimeout(function () {
+      state.inputFallbackTimer = null;
+      if (state.destroyed || state.bypassSend || state.ignoreInputDetection || state.pending) return;
+      var current = getEditableValue(input);
+      if (!extractXhsUrl(current) && !extractXhsUrl(source)) return;
+      var preserve = extractXhsUrl(inserted) ? before : stripXhsUrls(current);
+      beginReadFromInput(input, source, preserve);
+    }, 80);
   }
 
   function isVisible(node) {
@@ -492,7 +602,29 @@
       return false;
     }
     if (/(send|发送|submit)/i.test(label) || button.type === "submit") return true;
-    return findSendButton(input) === button;
+    if (findSendButton(input) === button) return true;
+    if (!label.trim()) {
+      var buttonRect = button.getBoundingClientRect();
+      var inputRect = input.getBoundingClientRect();
+      var buttonY = buttonRect.top + buttonRect.height / 2;
+      var inputY = inputRect.top + inputRect.height / 2;
+      if (buttonRect.left >= inputRect.right - 28 && Math.abs(buttonY - inputY) < 72) return true;
+    }
+    return false;
+  }
+
+  function findLikelyInput(button) {
+    if (state.lastInput && isEditable(state.lastInput) && isVisible(state.lastInput)) return state.lastInput;
+    if (isEditable(document.activeElement) && isVisible(document.activeElement)) return document.activeElement;
+    var root = button && button.parentElement;
+    for (var level = 0; root && level < 7; level += 1, root = root.parentElement) {
+      var candidates = Array.from(root.querySelectorAll("textarea,input,[contenteditable='true']"))
+        .filter(function (node) { return isEditable(node) && isVisible(node); });
+      if (candidates.length) return candidates[candidates.length - 1];
+    }
+    var visible = Array.from(document.querySelectorAll("textarea,input,[contenteditable='true']"))
+      .filter(function (node) { return isEditable(node) && isVisible(node); });
+    return visible.length ? visible[visible.length - 1] : null;
   }
 
   function nextFrame() {
@@ -538,23 +670,40 @@
   }
 
   function onKeyDown(event) {
-    if (state.destroyed || state.bypassSend || !state.pending || state.pending.status !== "ready") return;
+    if (state.destroyed || state.bypassSend) return;
     if (!isEditable(event.target)) return;
     if (event.key === "Enter" && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      if (!state.pending) {
+        if (!extractXhsUrl(getEditableValue(event.target))) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        beginReadFromInput(event.target, getEditableValue(event.target));
+        return;
+      }
       event.preventDefault();
       event.stopImmediatePropagation();
-      sendPending(null);
+      if (state.pending.status === "ready") sendPending(null);
+      else toast("小红书内容还在读取，请稍等");
     }
   }
 
   function onClick(event) {
-    if (state.destroyed || state.bypassSend || !state.pending || state.pending.status !== "ready") return;
+    if (state.destroyed || state.bypassSend) return;
     var button = event.target && event.target.closest ? event.target.closest("button") : null;
-    var input = state.pending.input || state.lastInput;
+    if (!button) return;
+    var input = state.pending ? (state.pending.input || state.lastInput) : findLikelyInput(button);
     if (!looksLikeSendButton(button, input)) return;
+    if (!state.pending) {
+      if (!input || !extractXhsUrl(getEditableValue(input))) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      beginReadFromInput(input, getEditableValue(input));
+      return;
+    }
     event.preventDefault();
     event.stopImmediatePropagation();
-    sendPending(button);
+    if (state.pending.status === "ready") sendPending(button);
+    else toast("小红书内容还在读取，请稍等");
   }
 
   function cardFromPayload(payload) {
@@ -657,6 +806,9 @@
   function installListeners() {
     if (state.listenersInstalled) return;
     document.addEventListener("paste", onPaste, true);
+    document.addEventListener("beforeinput", onBeforeInput, true);
+    document.addEventListener("input", onInput, true);
+    document.addEventListener("focusin", onFocusIn, true);
     document.addEventListener("keydown", onKeyDown, true);
     document.addEventListener("click", onClick, true);
     state.listenersInstalled = true;
@@ -676,10 +828,15 @@
     state.observer = null;
     if (state.listenersInstalled) {
       document.removeEventListener("paste", onPaste, true);
+      document.removeEventListener("beforeinput", onBeforeInput, true);
+      document.removeEventListener("input", onInput, true);
+      document.removeEventListener("focusin", onFocusIn, true);
       document.removeEventListener("keydown", onKeyDown, true);
       document.removeEventListener("click", onClick, true);
     }
     state.listenersInstalled = false;
+    if (state.inputFallbackTimer) clearTimeout(state.inputFallbackTimer);
+    state.inputFallbackTimer = null;
     if (state.style && state.style.parentNode) state.style.parentNode.removeChild(state.style);
   }
 
@@ -688,18 +845,28 @@
     var style = element("style");
     style.textContent = [
       ".rxf-settings-root{height:100%;overflow:auto;padding:16px;background:#f6f7f9;color:#222;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;box-sizing:border-box}",
+      ".rxf-settings-top{display:flex;align-items:center;gap:12px;margin:0 0 4px}.rxf-settings-close{border:0;border-radius:10px;padding:8px 11px;background:#e8e9ec;color:#222;font-size:14px;font-weight:700;white-space:nowrap}.rxf-settings-top .rxf-settings-title{margin:0}",
       ".rxf-settings-root *{box-sizing:border-box}.rxf-settings-title{font-size:20px;font-weight:750;margin:2px 0 4px}.rxf-settings-sub{font-size:13px;color:#72767e;line-height:1.5;margin-bottom:18px}",
       ".rxf-settings-card{background:#fff;border:1px solid #e7e8eb;border-radius:15px;padding:14px;margin-bottom:12px}.rxf-settings-label{display:block;font-size:13px;font-weight:700;margin:0 0 6px}",
       ".rxf-settings-hint{font-size:12px;color:#83868d;line-height:1.45;margin:5px 0 0}.rxf-settings-input{width:100%;border:1px solid #d7d9de;border-radius:10px;padding:11px 12px;background:#fff;color:#222;font-size:14px;outline:none}",
       ".rxf-settings-input:focus{border-color:#ff2442;box-shadow:0 0 0 3px rgba(255,36,66,.1)}.rxf-settings-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:13px}",
       ".rxf-settings-check{width:20px;height:20px;accent-color:#ff2442}.rxf-settings-actions{display:flex;gap:9px;margin-top:14px}.rxf-settings-button{flex:1;border:0;border-radius:10px;padding:11px;background:#e8e9ec;color:#222;font-size:14px;font-weight:700}",
       ".rxf-settings-button.primary{background:#ff2442;color:#fff}.rxf-settings-status{font-size:12px;line-height:1.45;margin-top:10px;color:#70747b;white-space:pre-wrap}.rxf-settings-status.ok{color:#16803c}.rxf-settings-status.bad{color:#b42318}",
-      "@media(prefers-color-scheme:dark){.rxf-settings-root{background:#111214;color:#f3f3f4}.rxf-settings-card,.rxf-settings-input{background:#1d1e21;color:#f3f3f4;border-color:#34363b}.rxf-settings-sub,.rxf-settings-hint{color:#969aa2}.rxf-settings-button{background:#34363b;color:#f3f3f4}}"
+      "@media(prefers-color-scheme:dark){.rxf-settings-root{background:#111214;color:#f3f3f4}.rxf-settings-card,.rxf-settings-input{background:#1d1e21;color:#f3f3f4;border-color:#34363b}.rxf-settings-sub,.rxf-settings-hint{color:#969aa2}.rxf-settings-button,.rxf-settings-close{background:#34363b;color:#f3f3f4}}"
     ].join("");
     container.appendChild(style);
     var root = element("div", "rxf-settings-root");
     container.appendChild(root);
-    root.appendChild(element("div", "rxf-settings-title", "小红书转发"));
+    var top = element("div", "rxf-settings-top");
+    var close = element("button", "rxf-settings-close", "‹ 返回");
+    close.type = "button";
+    close.onclick = function () {
+      if (roche && roche.ui && typeof roche.ui.closeApp === "function") roche.ui.closeApp();
+      else if (window.history && window.history.length > 1) window.history.back();
+    };
+    top.appendChild(close);
+    top.appendChild(element("div", "rxf-settings-title", "小红书转发"));
+    root.appendChild(top);
     root.appendChild(element("div", "rxf-settings-sub", "在聊天输入框粘贴小红书分享链接，插件会读取正文和配图文字，再生成可见的转发卡片。"));
 
     var config = Object.assign({}, state.config);
