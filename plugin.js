@@ -2,7 +2,7 @@
   "use strict";
 
   var PLUGIN_ID = "roche-xhs-forwarder";
-  var VERSION = "0.3.0";
+  var VERSION = "0.3.1";
   var CONFIG_KEY = "rxf_xhs_config_v1";
   var MARKER_START = "[XHS_CARD_V1]";
   var MARKER_END = "[/XHS_CARD_V1]";
@@ -366,18 +366,25 @@
       ".rxf-xhs-btn:disabled{opacity:.55;}",
       ".rxf-xhs-spinner{width:15px;height:15px;border:2px solid rgba(255,36,66,.25);border-top-color:#ff2442;border-radius:50%;animation:rxfspin .8s linear infinite;}",
       "@keyframes rxfspin{to{transform:rotate(360deg)}}",
-      ".rxf-rendered-card{max-width:360px;min-width:245px;border-radius:14px;overflow:hidden;background:#fff;color:#202124;border:1px solid rgba(0,0,0,.09);box-shadow:0 2px 9px rgba(0,0,0,.08);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer;text-align:left;}",
+      ".rxf-rendered-card{width:min(410px,calc(100vw - 94px));min-width:250px;border-radius:18px;overflow:hidden;background:#fff;color:#202124;border:1px solid rgba(0,0,0,.08);box-shadow:0 5px 18px rgba(24,24,28,.10);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;text-align:left;}",
       ".rxf-card-note{padding:10px 12px;border-bottom:1px solid #eee;font-size:14px;line-height:1.45;white-space:pre-wrap;}",
-      ".rxf-card-main{display:flex;gap:10px;padding:11px 12px;}",
-      ".rxf-card-main .rxf-xhs-cover,.rxf-card-main .rxf-xhs-cover-fallback{width:78px;height:78px;}",
-      ".rxf-card-source{font-size:11px;color:#ff2442;font-weight:750;margin-bottom:4px;}",
-      ".rxf-card-title{font-size:14px;line-height:1.35;font-weight:700;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}",
-      ".rxf-card-desc{font-size:12px;line-height:1.35;color:#777;margin-top:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}",
-      ".rxf-card-gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:0 12px 11px;}",
-      ".rxf-card-gallery img{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:7px;background:#f0f1f3;}",
-      ".rxf-card-foot{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#f7f7f8;color:#767a80;font-size:11px;}",
+      ".rxf-card-top{display:flex;align-items:center;gap:8px;padding:10px 13px;background:rgba(255,255,255,.96);cursor:pointer;}",
+      ".rxf-card-logo{display:grid;place-items:center;width:26px;height:26px;border-radius:9px;background:linear-gradient(135deg,#ff2442,#ff637c);color:#fff;font-size:12px;font-weight:850;letter-spacing:-.5px;box-shadow:0 3px 8px rgba(255,36,66,.22);}",
+      ".rxf-card-source{flex:1;font-size:12px;color:#ff2442;font-weight:800;}",
+      ".rxf-card-kind{font-size:11px;color:#9a9da3;}",
+      ".rxf-card-media{position:relative;background:linear-gradient(145deg,#f3f0f6,#eee9f3);overflow:hidden;}",
+      ".rxf-card-hero{display:flex;align-items:center;justify-content:center;width:100%;min-height:260px;background:rgba(255,255,255,.28);}",
+      ".rxf-card-hero img{display:block;width:100%;height:auto;max-height:520px;aspect-ratio:3/4;object-fit:contain;background:#f4f1f6;}",
+      ".rxf-card-count{position:absolute;right:10px;bottom:10px;padding:4px 8px;border-radius:999px;background:rgba(20,20,24,.68);color:#fff;font-size:10px;font-weight:700;line-height:1;backdrop-filter:blur(8px);pointer-events:none;}",
+      ".rxf-card-empty{display:grid;place-items:center;min-height:220px;background:linear-gradient(145deg,#ff2442,#ff91a2);color:#fff;font-size:26px;font-weight:850;letter-spacing:2px;}",
+      ".rxf-card-info{padding:12px 14px 13px;cursor:pointer;}",
+      ".rxf-card-title{font-size:16px;line-height:1.4;font-weight:760;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}",
+      ".rxf-card-desc{font-size:12px;line-height:1.5;color:#777;margin-top:6px;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;}",
+      ".rxf-card-author{display:flex;align-items:center;gap:6px;margin-top:9px;color:#9a9da3;font-size:11px;}",
+      ".rxf-card-author-dot{width:5px;height:5px;border-radius:50%;background:#ff2442;}",
+      ".rxf-card-foot{display:flex;align-items:center;gap:6px;padding:10px 14px;background:#f7f7f8;color:#767a80;font-size:11px;border-top:1px solid rgba(0,0,0,.035);cursor:pointer;}",
       ".rxf-card-foot span:first-child{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
-      "@media(prefers-color-scheme:dark){.rxf-xhs-preview,.rxf-rendered-card{background:rgba(31,32,35,.97);color:#f4f4f5;border-color:rgba(255,255,255,.1)}.rxf-xhs-preview-head,.rxf-card-note{border-color:rgba(255,255,255,.09)}.rxf-xhs-meta,.rxf-card-desc,.rxf-card-foot{color:#a8abb2}.rxf-xhs-btn{background:#3b3d42;color:#f4f4f5}.rxf-card-foot{background:#292a2e}}"
+      "@media(prefers-color-scheme:dark){.rxf-xhs-preview,.rxf-rendered-card{background:rgba(31,32,35,.98);color:#f4f4f5;border-color:rgba(255,255,255,.1)}.rxf-xhs-preview-head,.rxf-card-note{border-color:rgba(255,255,255,.09)}.rxf-card-top{background:#202125}.rxf-card-media,.rxf-card-hero,.rxf-card-hero img{background:#292a2f}.rxf-xhs-meta,.rxf-card-desc,.rxf-card-author,.rxf-card-foot{color:#a8abb2}.rxf-xhs-btn{background:#3b3d42;color:#f4f4f5}.rxf-card-foot{background:#292a2e;border-color:rgba(255,255,255,.05)}}"
     ].join("");
     document.head.appendChild(style);
     state.style = style;
@@ -719,48 +726,68 @@
 
   function cardFromPayload(payload) {
     var card = element("div", "rxf-rendered-card");
-    card.setAttribute("role", "link");
-    card.tabIndex = 0;
     if (payload.userNote) card.appendChild(element("div", "rxf-card-note", payload.userNote));
-    var main = element("div", "rxf-card-main");
-    main.appendChild(makeCover(payload.cover));
-    var copy = element("div", "rxf-xhs-copy");
-    copy.appendChild(element("div", "rxf-card-source", "小红书 · 转发"));
-    copy.appendChild(element("div", "rxf-card-title", payload.title || "小红书笔记"));
-    var desc = payload.author || payload.content || "";
-    if (desc) copy.appendChild(element("div", "rxf-card-desc", desc));
-    main.appendChild(copy);
-    card.appendChild(main);
+
     var images = Array.isArray(payload.images) ? payload.images.slice(0, 9) : [];
-    if (images.length) {
-      var gallery = element("div", "rxf-card-gallery");
-      images.forEach(function (url) {
-        var image = element("img", "");
-        image.src = url;
-        image.alt = "小红书配图";
-        image.loading = "lazy";
-        image.referrerPolicy = "no-referrer";
-        image.onerror = function () {
-          if (image.parentNode) image.parentNode.removeChild(image);
-        };
-        gallery.appendChild(image);
-      });
-      card.appendChild(gallery);
+    if (!images.length && payload.cover) images.push(payload.cover);
+    var imageCount = Number(payload.imageCount) || images.length;
+    var cover = images[0] || payload.cover || "";
+
+    var top = element("div", "rxf-card-top");
+    top.appendChild(element("div", "rxf-card-logo", "RED"));
+    top.appendChild(element("div", "rxf-card-source", "小红书 · 转发"));
+    top.appendChild(element("div", "rxf-card-kind", imageCount ? "图文 · " + imageCount + " 张" : "图文笔记"));
+    card.appendChild(top);
+
+    var media = element("div", "rxf-card-media");
+    if (cover) {
+      var hero = element("div", "rxf-card-hero");
+      var image = element("img", "");
+      image.src = cover;
+      image.alt = "小红书首图";
+      image.loading = "lazy";
+      image.referrerPolicy = "no-referrer";
+      image.onerror = function () {
+        hero.replaceChildren(element("div", "rxf-card-desc", "首图暂时无法显示"));
+      };
+      hero.appendChild(image);
+      media.appendChild(hero);
+      media.appendChild(element("div", "rxf-card-count", imageCount > 1 ? "首图 · 共 " + imageCount + " 张" : "1 张"));
+    } else {
+      media.appendChild(element("div", "rxf-card-empty", "小红书"));
     }
+    card.appendChild(media);
+
+    var info = element("div", "rxf-card-info");
+    info.appendChild(element("div", "rxf-card-title", payload.title || "小红书笔记"));
+    if (payload.content) info.appendChild(element("div", "rxf-card-desc", payload.content));
+    if (payload.author) {
+      var author = element("div", "rxf-card-author");
+      author.appendChild(element("span", "rxf-card-author-dot"));
+      author.appendChild(element("span", "", payload.author));
+      info.appendChild(author);
+    }
+    card.appendChild(info);
+
     var foot = element("div", "rxf-card-foot");
     var label = payload.imageCount
-      ? "已读取正文和 " + payload.imageCount + " 张原图"
+      ? "正文 · " + payload.imageCount + " 张原图"
       : "已读取笔记正文";
     if (payload.ocrCount) label += " · 识别 " + payload.ocrCount + " 张图中文字";
     foot.appendChild(element("span", "", label));
-    foot.appendChild(element("span", "", "打开 ›"));
+    foot.appendChild(element("span", "", "打开原文 ›"));
     card.appendChild(foot);
+
     function open() {
       if (payload.url) window.open(payload.url, "_blank", "noopener,noreferrer");
     }
-    card.addEventListener("click", open);
-    card.addEventListener("keydown", function (event) {
+    [top, info, foot].forEach(function (node) {
+      node.setAttribute("role", "link");
+      node.tabIndex = 0;
+      node.addEventListener("click", open);
+      node.addEventListener("keydown", function (event) {
       if (event.key === "Enter" || event.key === " ") open();
+      });
     });
     return card;
   }
