@@ -1,10 +1,13 @@
 import puppeteer from "@cloudflare/puppeteer";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 const MAX_IMAGES = 9;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_HTML_BYTES = 4 * 1024 * 1024;
 const CACHE_SECONDS = 6 * 60 * 60;
+const MEDIA_TTL_SECONDS = 30 * 24 * 60 * 60;
 const OCR_MODEL = "@cf/moondream/moondream3.1-9B-A2B";
+const MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -51,6 +54,10 @@ export default {
         });
       }
 
+      if (request.method === "GET" && url.pathname === "/media") {
+        return proxyMedia(request, env);
+      }
+
       if (request.method === "POST" && url.pathname === "/extract/xhs") {
         requireKey(request, env);
         const payload = await readPayload(request);
@@ -63,7 +70,7 @@ export default {
         const cached = await cache.match(cacheRequest);
         if (cached) return withCors(cached);
 
-        const result = await extractXhs(env, originalUrl, useOcr, maxImages);
+        const result = await extractXhs(env, originalUrl, useOcr, maxImages, url.origin);
         const response = jsonResponse(result, 200, {
           "Cache-Control": "public, max-age=" + CACHE_SECONDS
         });
@@ -83,8 +90,10 @@ export default {
   }
 };
 
-async function extractXhs(env, originalUrl, useOcr, maxImages) {
+async function extractXhs(env, originalUrl, useOcr, maxImages, serviceOrigin) {
   const extracted = await extractPage(env, originalUrl);
+  const restriction = detectRestriction(extracted);
+  if (restriction) throw new HttpError(422, restriction);
   let title = cleanText(extracted.title, 180);
   if (["小红书", "小红书 - 你的生活兴趣社区", "RedNote"].includes(title)) title = "";
 
@@ -122,6 +131,11 @@ async function extractXhs(env, originalUrl, useOcr, maxImages) {
     }
   }
 
+  const referer = extracted.canonicalUrl || originalUrl;
+  const publicImages = await Promise.all(images.map((imageUrl) => (
+    makeSignedMediaUrl(env, serviceOrigin, imageUrl, referer)
+  )));
+
   return {
     ok: true,
     source: "xiaohongshu",
@@ -130,20 +144,168 @@ async function extractXhs(env, originalUrl, useOcr, maxImages) {
     title: title || "小红书笔记",
     author,
     content,
-    cover,
-    images,
+    cover: publicImages[images.indexOf(cover)] || publicImages[0] || "",
+    images: publicImages,
     imageOcr,
     warnings
   };
 }
 
 async function extractPage(env, originalUrl) {
+  let directError;
+  try {
+    return await extractPageDirect(originalUrl);
+  } catch (error) {
+    directError = error;
+    console.warn("Direct HTML extraction failed", error);
+  }
+
+  if (!env.BROWSER) {
+    if (directError instanceof HttpError) throw directError;
+    throw new HttpError(503, "轻量读取失败，且 Cloudflare Browser Run 绑定不可用");
+  }
+  return extractPageWithBrowser(env, originalUrl);
+}
+
+async function extractPageDirect(originalUrl) {
+  const response = await fetch(originalUrl, {
+    redirect: "follow",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.7",
+      "Cache-Control": "no-cache",
+      "User-Agent": MOBILE_USER_AGENT
+    }
+  });
+  if (!response.ok) {
+    throw new HttpError(422, "小红书分享链接返回 HTTP " + response.status);
+  }
+  const finalUrl = validatePageUrl(response.url || originalUrl);
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+  if (contentType && !contentType.includes("text/html")) {
+    throw new HttpError(422, "小红书分享链接没有返回网页内容");
+  }
+  const declaredSize = Number(response.headers.get("content-length") || 0);
+  if (declaredSize > MAX_HTML_BYTES) {
+    throw new HttpError(422, "小红书页面过大，无法安全读取");
+  }
+  const html = await response.text();
+  if (new TextEncoder().encode(html).byteLength > MAX_HTML_BYTES) {
+    throw new HttpError(422, "小红书页面过大，无法安全读取");
+  }
+  const extracted = extractServerRenderedState(html);
+  extracted.canonicalUrl = finalUrl;
+  extracted.cookies = [];
+  extracted.userAgent = MOBILE_USER_AGENT;
+  return extracted;
+}
+
+function extractServerRenderedState(html) {
+  const marker = "window.__SETUP_SERVER_STATE__=";
+  const start = html.indexOf(marker);
+  if (start < 0) return extractBasicHtml(html);
+  const end = html.indexOf("</script>", start + marker.length);
+  if (end < 0) throw new HttpError(422, "小红书页面数据不完整");
+
+  let state;
+  try {
+    const raw = html.slice(start + marker.length, end).replace(/;\s*$/, "");
+    state = JSON.parse(raw);
+  } catch (_) {
+    throw new HttpError(422, "无法解析小红书页面数据");
+  }
+
+  const pageData = state && state.LAUNCHER_SSR_STORE_PAGE_DATA;
+  const note = pageData && pageData.noteData;
+  if (!note || typeof note !== "object") return extractBasicHtml(html);
+
+  const images = [];
+  const addImage = (value) => {
+    const normalized = normalizeMediaUrl(value);
+    if (normalized && !images.includes(normalized)) images.push(normalized);
+  };
+  for (const item of Array.isArray(note.imageList) ? note.imageList : []) {
+    if (!item || typeof item !== "object") continue;
+    const detail = Array.isArray(item.infoList)
+      ? item.infoList.find((info) => info && info.imageScene === "H5_DTL" && info.url)
+      : null;
+    addImage((detail && detail.url) || item.url);
+    if (!images.length && Array.isArray(item.infoList)) {
+      for (const info of item.infoList) addImage(info && info.url);
+    }
+  }
+
+  const user = note.user || {};
+  return {
+    title: note.title || "",
+    content: note.desc || note.description || "",
+    author: user.nickName || user.nickname || user.name || "",
+    images,
+    cover: images[0] || "",
+    bodyText: cleanText([note.title, note.desc].filter(Boolean).join("\n"), 12000)
+  };
+}
+
+function extractBasicHtml(html) {
+  const pick = (pattern) => {
+    const match = html.match(pattern);
+    return match ? decodeHtml(match[1]) : "";
+  };
+  const title = pick(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']*)["'][^>]*>/i)
+    || pick(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const content = pick(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']*)["'][^>]*>/i)
+    || pick(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["'][^>]*>/i);
+  const images = [];
+  const imagePattern = /<img[^>]+(?:data-xhs-img[^>]+src|src)=["']([^"']+)["'][^>]*>/gi;
+  let match;
+  while ((match = imagePattern.exec(html)) && images.length < MAX_IMAGES) {
+    const url = normalizeMediaUrl(decodeHtml(match[1]));
+    if (url && !images.includes(url)) images.push(url);
+  }
+  return {
+    title,
+    content,
+    author: "",
+    images,
+    cover: images[0] || "",
+    bodyText: cleanText(html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " "), 12000)
+  };
+}
+
+function decodeHtml(value) {
+  return String(value || "")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)));
+}
+
+function detectRestriction(extracted) {
+  const text = cleanText([
+    extracted && extracted.title,
+    extracted && extracted.content,
+    extracted && extracted.bodyText
+  ].filter(Boolean).join("\n"), 14000);
+  if (/300012|IP\s*存在风险|安全限制|访问频次异常|网络环境.*风险/i.test(text)) {
+    return "小红书阻止了当前网络访问（安全限制 300012），请稍后重试或换一条新分享链接";
+  }
+  if (/登录后查看|请先登录|扫码登录/.test(text) && !(extracted && extracted.images && extracted.images.length)) {
+    return "小红书要求登录，暂时无法读取这条笔记";
+  }
+  return "";
+}
+
+async function extractPageWithBrowser(env, originalUrl) {
   if (!env.BROWSER) throw new HttpError(503, "Cloudflare Browser Run 绑定不可用");
 
   let browser;
   try {
     browser = await puppeteer.launch(env.BROWSER);
     const page = await browser.newPage();
+    await page.setUserAgent(MOBILE_USER_AGENT);
+    await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
     await page.setExtraHTTPHeaders({
       "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.7",
       DNT: "1"
@@ -373,6 +535,94 @@ async function runOcr(env, imageUrls, referer, cookies, userAgent) {
   return { items, warnings };
 }
 
+async function makeSignedMediaUrl(env, serviceOrigin, imageUrl, referer) {
+  const configuredKey = String(env.GATEWAY_KEY || "");
+  if (!configuredKey) throw new HttpError(503, "后端尚未设置 GATEWAY_KEY");
+  const normalizedImage = normalizeMediaUrl(imageUrl);
+  const normalizedReferer = validatePageUrl(referer);
+  if (!normalizedImage) throw new HttpError(422, "配图地址无效");
+  const expires = Math.floor(Date.now() / 1000) + MEDIA_TTL_SECONDS;
+  const payload = [normalizedImage, normalizedReferer, expires].join("\n");
+  const signature = await hmacSignature(configuredKey, payload);
+  const url = new URL("/media", serviceOrigin);
+  url.searchParams.set("u", normalizedImage);
+  url.searchParams.set("r", normalizedReferer);
+  url.searchParams.set("e", String(expires));
+  url.searchParams.set("s", signature);
+  return url.toString();
+}
+
+async function proxyMedia(request, env) {
+  const configuredKey = String(env.GATEWAY_KEY || "");
+  if (!configuredKey) return jsonResponse({ detail: "后端尚未设置 GATEWAY_KEY" }, 503);
+
+  try {
+    const requestUrl = new URL(request.url);
+    const imageUrl = normalizeMediaUrl(requestUrl.searchParams.get("u"));
+    const referer = validatePageUrl(requestUrl.searchParams.get("r"));
+    const expires = Number(requestUrl.searchParams.get("e") || 0);
+    const suppliedSignature = requestUrl.searchParams.get("s") || "";
+    const now = Math.floor(Date.now() / 1000);
+    if (!imageUrl || !Number.isInteger(expires) || expires < now || expires > now + MEDIA_TTL_SECONDS + 300) {
+      throw new HttpError(403, "配图链接已失效，请重新转发笔记");
+    }
+    const expectedSignature = await hmacSignature(
+      configuredKey,
+      [imageUrl, referer, expires].join("\n")
+    );
+    if (!safeEqual(suppliedSignature, expectedSignature)) {
+      throw new HttpError(403, "配图签名无效");
+    }
+
+    const upstream = await fetch(imageUrl, {
+      redirect: "follow",
+      headers: {
+        Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        Referer: referer,
+        "User-Agent": MOBILE_USER_AGENT
+      }
+    });
+    if (!upstream.ok || !normalizeMediaUrl(upstream.url)) {
+      throw new HttpError(502, "暂时无法下载小红书配图");
+    }
+    const contentType = (upstream.headers.get("content-type") || "").split(";", 1)[0].trim();
+    if (!contentType.startsWith("image/")) throw new HttpError(502, "小红书配图格式异常");
+    const declaredSize = Number(upstream.headers.get("content-length") || 0);
+    if (declaredSize > MAX_IMAGE_BYTES) throw new HttpError(413, "小红书配图过大");
+    const raw = await upstream.arrayBuffer();
+    if (raw.byteLength > MAX_IMAGE_BYTES) throw new HttpError(413, "小红书配图过大");
+    return new Response(raw, {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=86400",
+        "Access-Control-Allow-Origin": "*",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  } catch (error) {
+    const status = error instanceof HttpError ? error.status : 500;
+    const detail = error instanceof HttpError ? error.message : "配图代理暂时出错";
+    return jsonResponse({ detail }, status);
+  }
+}
+
+async function hmacSignature(secret, payload) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
+  return arrayBufferToBase64(signature)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
 async function downloadImageAsDataUri(url, referer, cookieHeader, userAgent) {
   const imageUrl = normalizeMediaUrl(url);
   if (!imageUrl) throw new Error("invalid image url");
@@ -452,7 +702,9 @@ function normalizeMediaUrl(raw) {
     const host = url.hostname.toLowerCase().replace(/\.$/, "");
     const allowed = ["xhscdn.com", "rednote.com", "xiaohongshu.com"]
       .some((base) => host === base || host.endsWith("." + base));
-    return allowed ? url.toString() : "";
+    if (!allowed) return "";
+    if (url.protocol === "http:") url.protocol = "https:";
+    return url.toString();
   } catch (_) {
     return "";
   }

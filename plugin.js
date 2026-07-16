@@ -2,7 +2,7 @@
   "use strict";
 
   var PLUGIN_ID = "roche-xhs-forwarder";
-  var VERSION = "0.2.2";
+  var VERSION = "0.3.0";
   var CONFIG_KEY = "rxf_xhs_config_v1";
   var MARKER_START = "[XHS_CARD_V1]";
   var MARKER_END = "[/XHS_CARD_V1]";
@@ -265,6 +265,9 @@
   }
 
   function buildOutgoingMessage(data, userNote) {
+    var images = Array.isArray(data.images)
+      ? data.images.filter(function (url) { return /^https?:\/\//i.test(String(url || "")); }).slice(0, 12)
+      : [];
     var display = {
       id: String(Date.now()) + Math.random().toString(36).slice(2, 7),
       source: "小红书",
@@ -273,7 +276,8 @@
       author: cleanText(data.author, 80),
       content: cleanText(data.content, 500),
       cover: data.cover || "",
-      imageCount: Array.isArray(data.images) ? data.images.length : 0,
+      images: images,
+      imageCount: images.length,
       ocrCount: Array.isArray(data.imageOcr)
         ? data.imageOcr.filter(function (item) { return cleanText(item && item.text); }).length
         : 0,
@@ -286,6 +290,11 @@
     lines.push("标题：" + display.title);
     if (display.author) lines.push("作者：" + display.author);
     if (data.content) lines.push("笔记正文：\n" + cleanText(data.content, 6500));
+    if (images.length) {
+      lines.push("配图原图地址（按笔记顺序）：\n" + images.map(function (url, index) {
+        return (index + 1) + ". " + url;
+      }).join("\n"));
+    }
     if (ocr) lines.push("配图文字识别：\n" + cleanText(ocr, 6500));
     lines.push("原链接：" + display.url);
     lines.push("【小红书笔记结束】");
@@ -364,6 +373,8 @@
       ".rxf-card-source{font-size:11px;color:#ff2442;font-weight:750;margin-bottom:4px;}",
       ".rxf-card-title{font-size:14px;line-height:1.35;font-weight:700;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}",
       ".rxf-card-desc{font-size:12px;line-height:1.35;color:#777;margin-top:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}",
+      ".rxf-card-gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:0 12px 11px;}",
+      ".rxf-card-gallery img{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:7px;background:#f0f1f3;}",
       ".rxf-card-foot{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#f7f7f8;color:#767a80;font-size:11px;}",
       ".rxf-card-foot span:first-child{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
       "@media(prefers-color-scheme:dark){.rxf-xhs-preview,.rxf-rendered-card{background:rgba(31,32,35,.97);color:#f4f4f5;border-color:rgba(255,255,255,.1)}.rxf-xhs-preview-head,.rxf-card-note{border-color:rgba(255,255,255,.09)}.rxf-xhs-meta,.rxf-card-desc,.rxf-card-foot{color:#a8abb2}.rxf-xhs-btn{background:#3b3d42;color:#f4f4f5}.rxf-card-foot{background:#292a2e}}"
@@ -720,10 +731,27 @@
     if (desc) copy.appendChild(element("div", "rxf-card-desc", desc));
     main.appendChild(copy);
     card.appendChild(main);
+    var images = Array.isArray(payload.images) ? payload.images.slice(0, 9) : [];
+    if (images.length) {
+      var gallery = element("div", "rxf-card-gallery");
+      images.forEach(function (url) {
+        var image = element("img", "");
+        image.src = url;
+        image.alt = "小红书配图";
+        image.loading = "lazy";
+        image.referrerPolicy = "no-referrer";
+        image.onerror = function () {
+          if (image.parentNode) image.parentNode.removeChild(image);
+        };
+        gallery.appendChild(image);
+      });
+      card.appendChild(gallery);
+    }
     var foot = element("div", "rxf-card-foot");
-    var label = payload.ocrCount
-      ? "已读取正文和 " + payload.ocrCount + " 张配图文字"
+    var label = payload.imageCount
+      ? "已读取正文和 " + payload.imageCount + " 张原图"
       : "已读取笔记正文";
+    if (payload.ocrCount) label += " · 识别 " + payload.ocrCount + " 张图中文字";
     foot.appendChild(element("span", "", label));
     foot.appendChild(element("span", "", "打开 ›"));
     card.appendChild(foot);
